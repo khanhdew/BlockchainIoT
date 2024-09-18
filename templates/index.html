@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.js"></script>
+<body>
+<canvas id="myChart" style="width:100%;max-width:600px"></canvas>
+
+<script>
+const xValues = [];
+const yValuesTemp = [];
+const yValuesHumid = [];
+const yValuesSoil = [];
+
+const ctx = document.getElementById('myChart').getContext('2d');
+const myChart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: xValues,
+    datasets: [
+      {
+        label: 'Temperature',
+        fill: false,
+        lineTension: 0,
+        backgroundColor: "rgba(255,0,0,1.0)",
+        borderColor: "rgba(255,0,0,0.1)",
+        data: yValuesTemp
+      },
+      {
+        label: 'Humidity',
+        fill: false,
+        lineTension: 0,
+        backgroundColor: "rgba(0,255,0,1.0)",
+        borderColor: "rgba(0,255,0,0.1)",
+        data: yValuesHumid
+      },
+      {
+        label: 'Soil Moisture',
+        fill: false,
+        lineTension: 0,
+        backgroundColor: "rgba(0,0,255,1.0)",
+        borderColor: "rgba(0,0,255,0.1)",
+        data: yValuesSoil
+      }
+    ]
+  },
+  options: {
+    legend: { display: true },
+    scales: {
+      yAxes: [{ ticks: { min: 0, max: 100 } }],
+      xAxes: [{ ticks: { min: 0, max: 100 } }]
+    }
+  }
+});
+
+const ws = new WebSocket("ws://localhost:8000/ws");
+ws.onmessage = function(event) {
+  const data = JSON.parse(event.data);
+  const sensorData = data;  // Adjust according to your metadata structure
+  console.log(sensorData);
+  sensorData.forEach(point => {
+    xValues.push(new Date(point.timestamp * 1000).toLocaleTimeString());
+    console.log(new Date(point.timestamp * 1000).toLocaleTimeString())
+    yValuesTemp.push(point.temp);
+    yValuesHumid.push(point.humid);
+    yValuesSoil.push(point.soil);
+  });
+  myChart.update();
+};
+</script>
+
+</body>
+</html>

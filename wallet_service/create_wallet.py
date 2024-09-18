@@ -1,6 +1,6 @@
 from pycardano import Address, Network
 
-from wallet.generate_keys import load_keys
+from wallet_service.generate_keys import load_keys
 
 keys = load_keys()
 
