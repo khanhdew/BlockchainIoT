@@ -1,6 +1,6 @@
 import requests
 
-from wallet_service.config import project_key
+from app.wallet_service.config import project_key
 
 # Thay thế bằng API Key của bạn và địa chỉ ví cần kiểm tra
 API_KEY = project_key

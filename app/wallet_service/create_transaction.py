@@ -1,19 +1,17 @@
-from importlib.metadata import metadata
-
 from blockfrost import ApiUrls
 from from_root import from_root
 from pycardano import BlockFrostChainContext, TransactionBuilder, TransactionOutput, Metadata, AuxiliaryData, \
     AlonzoMetadata
 from pycardano import PaymentSigningKey, PaymentVerificationKey, Address, Network
 
-from wallet_service.config import project_key
+from app.wallet_service.config import project_key
 
 network = Network.TESTNET
 context = BlockFrostChainContext(project_key, base_url=ApiUrls.preview.value)
 
 
 def create_transaction(sensor_data):
-    payment_signing_key = PaymentSigningKey.load(from_root("wallet_service/payment.skey"))
+    payment_signing_key = PaymentSigningKey.load(from_root("app/wallet_service/payment.skey"))
     payment_verification_key = PaymentVerificationKey.from_signing_key(payment_signing_key)
     from_address = Address(payment_verification_key.hash(), network=network)
     # Metadata follows CIP20 standard
@@ -28,22 +26,6 @@ def create_transaction(sensor_data):
     signed_tx = builder.build_and_sign([payment_signing_key], change_address=from_address)
     return context.submit_tx(signed_tx)
 
-# sensor_data = {
-#     123: [
+# sensor_data = {674: [{'temp': 31, 'humid': 77, 'soil': 0, 'timestamp': 1726670267}, {'temp': 31, 'humid': 77, 'soil': 0, 'timestamp': 1726670277}, {'temp': 31, 'humid': 77, 'soil': 0, 'timestamp': 1726670288}, {'temp': 31, 'humid': 77, 'soil': 0, 'timestamp': 1726670298}]}
 #
-#             {
-#                 "temp": 25,
-#                 "humid": 70,
-#                 "soil": 50,
-#                 "timestamp": 1632741600
-#             },
-#             {
-#                 "temp": 26,
-#                 "humid": 71,
-#                 "soil": 51,
-#                 "timestamp": 1632745200
-#             }
-#
-#     ]
-# }
 # print(create_transaction(sensor_data))

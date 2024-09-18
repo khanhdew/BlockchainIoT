@@ -3,15 +3,13 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import asyncio
-import random
-from blockfrost_api.get_trans import get_metadata_from_tx
-from mqtt import connect
+from app.blockfrost_api.get_trans import get_metadata_from_tx
+from app.mqtt import connect
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
+templates = Jinja2Templates(directory="app/templates")
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 content = ""
-with open("templates/index.html") as f:
+with open("app/templates/index.html") as f:
     lines = f.readlines()
     for line in lines:
         content += line

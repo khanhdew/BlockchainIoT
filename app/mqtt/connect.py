@@ -5,11 +5,11 @@ import time
 
 from paho.mqtt import client as mqtt_client
 
-from wallet_service.create_transaction import create_transaction
+from app.wallet_service.create_transaction import create_transaction
 
 broker = 'localhost'
 port = 1883
-topic = "python/mqtt"
+topic = "v1/devices/me/telemetry"
 # Generate a Client ID with the subscribe prefix.
 client_id = f'python-mqtt-{random.randint(0, 1000)}'
 last_time = time.time()
@@ -39,7 +39,7 @@ def subscribe(client: mqtt_client):
                 "temp": int(temp['device']['sensor']['dht']['temp']),
                 "humid": int(temp['device']['sensor']['dht']['humid']),
                 "soil": int(temp['device']['sensor']['soil']),
-                "timestamp": int(temp['device']['timestamp'])
+                "timestamp": int(time.time())
             })
             sensor_data = {
                 674: datapoint
@@ -48,7 +48,9 @@ def subscribe(client: mqtt_client):
             # each 5 minutes send data to blockchain
             if time.time() - last_time >= 300:
                 last_time = time.time()
-                print(create_transaction(sensor_data))
+                tx_log = create_transaction(sensor_data)
+                print(tx_log)
+                # print(sensor_data)
                 datapoint.clear()
                 logging.info("Sent data to blockchain")
         except Exception as e:

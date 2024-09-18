@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0"></script>
+  <style>
+    #myChart { display: none; width: 100%; max-width: 600px; }
+    #keyForm, #walletSteps { margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+<div id="keyForm">
+  <label for="keyInput">Enter Key:</label>
+  <input type="text" id="keyInput">
+  <button onclick="checkKey()">Submit</button>
+</div>
+
+<div id="walletSteps" style="display: none;">
+  <button onclick="selectWallet()">Select Wallet</button>
+  <button onclick="signWallet()" disabled id="signButton">Sign Wallet</button>
+</div>
+<div>
+  <h2>Sensor Data Chart</h2>
+  <canvas id="myChart" height="200" width="1000"></canvas>
+</div>
+
+<script type="module">
+import { Lucid, Blockfrost } from "https://unpkg.com/lucid-cardano/web/mod.js"
+
+window.initializeLucid = async function() {
+  const lucid = await Lucid.new(
+    new Blockfrost("https://cardano-preview.blockfrost.io/api/v0", "previewZjUdBlro0hnCrCRKdOaVpJqUUkRstQOp"),
+    "Preview",
+  );
+  const api = await window.cardano.eternl.enable();
+  lucid.selectWallet(api);
+  console.log("Lucid initialized");
+  return lucid;
+}
+</script>
+
+<script>
+const validKey = '123456';  // Replace with your valid key
+let myChart;
+let ws;
+let lucidInstance;
+
+async function checkKey() {
+  const keyInput = document.getElementById('keyInput').value;
+
+  if (keyInput === validKey) {
+    showChart();
+  } else {
+    alert('Incorrect key, sending transaction to verify with smart contract...');
+    await sendVerificationTransaction(keyInput);
+  }
+}
+
+async function sendVerificationTransaction(keyInput) {
+  try {
+    lucidInstance = await window.initializeLucid();
+
+    const transaction = await lucidInstance
+      .newTx()
+      .payToAddress(
+        'addr_test1vzv4dx2g096tlq8f5l60le4p79unlny36h04tedc07d09eq0udqsz',  // Replace with your smart contract address
+        { lovelace: 1000000 }  // Transaction amount, typically set to a minimal amount
+      )
+      .attachMetadata(1234, { key: keyInput })  // Attach the entered key as metadata
+      .complete();
+
+    const signedTx = await lucidInstance.wallet.signTx(transaction);
+    const txHash = await lucidInstance.submitTx(signedTx);
+
+    alert(`Transaction sent with hash: ${txHash}`);
+
+    // Check transaction result (you would typically do this through your backend)
+    const isKeyValid = await checkKeyWithSmartContract(txHash);
+
+    if (isKeyValid) {
+      alert('Key is valid, showing chart...');
+      showChart();
+    } else {
+      alert('Invalid key, access denied.');
+    }
+
+  } catch (error) {
+    console.error('Error sending transaction:', error);
+    alert('Error verifying key with smart contract.');
+  }
+}
+
+async function checkKeyWithSmartContract(txHash) {
+  // Placeholder function - you would implement logic here to check with the smart contract
+  // if (!txHash) {
+  //   return false;
+  // }
+  // if(!lucidInstance) {
+  //   alert('Please select a wallet first');
+  //   return;
+  // }
+  // // check the transaction amount
+  //   const tx = await lucidInstance.wallet.getTx(txHash);
+  //   if (tx.amount.lovelace !== 1000000) {
+  //     return false;
+  //   }
+
+
+  // This can be done by querying the blockchain for the result of the transaction or
+  // using an oracle service.
+
+  // Simulate a delay for checking the transaction
+  await new Promise(resolve => setTimeout(resolve, 3000));
+
+  // For now, assume the key is always invalid for demonstration
+  return true;
+}
+
+async function selectWallet() {
+  try {
+    lucidInstance = await window.initializeLucid();
+    alert('Wallet selected successfully');
+    document.getElementById('signButton').disabled = false;
+  } catch (error) {
+    console.error('Error selecting wallet:', error);
+    alert('Error selecting wallet');
+  }
+}
+
+async function signWallet() {
+  if (!lucidInstance) {
+    alert('Please select a wallet first');
+    return;
+  }
+
+  try {
+    await new Promise(resolve => setTimeout(resolve, 1000));  // Simulate signing
+    alert('Wallet signed successfully');
+    showChart();
+  } catch (error) {
+    console.error('Error signing wallet:', error);
+    alert('Error signing wallet');
+  }
+}
+
+function showChart() {
+  document.getElementById('keyForm').style.display = 'none';
+  document.getElementById('walletSteps').style.display = 'none';
+  document.getElementById('myChart').style.display = 'block';
+  initializeChart();
+  startWebSocket();
+}
+
+function initializeChart() {
+  const ctx = document.getElementById('myChart').getContext('2d');
+  myChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          label: 'Temperature',
+          fill: false,
+          tension: 0.1,
+          backgroundColor: "rgba(255,0,0,1.0)",
+          borderColor: "rgba(255,0,0,0.5)",
+          data: []
+        },
+        {
+          label: 'Humidity',
+          fill: false,
+          tension: 0.1,
+          backgroundColor: "rgba(0,255,0,1.0)",
+          borderColor: "rgba(0,255,0,0.5)",
+          data: []
+        },
+        {
+          label: 'Soil Moisture',
+          fill: false,
+          tension: 0.1,
+          backgroundColor: "rgba(0,0,255,1.0)",
+          borderColor: "rgba(0,0,255,0.5)",
+          data: []
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: true }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          suggestedMax: 100
+        },
+        x: {
+          type: 'time',
+          time: {
+            unit: 'second',
+            displayFormats: {
+              second: 'HH:mm:ss'
+            }
+          },
+          ticks: {
+            source: 'auto',
+            autoSkip: true,
+            maxTicksLimit: 15
+          }
+        }
+      }
+    }
+  });
+}
+
+function startWebSocket() {
+  if (ws) {
+    ws.close();
+  }
+  ws = new WebSocket("ws://localhost:8000/ws");
+  ws.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    data.forEach(point => {
+      const timestamp = new Date(point.timestamp * 1000);
+      myChart.data.datasets[0].data.push({x: timestamp, y: point.temp});
+      myChart.data.datasets[1].data.push({x: timestamp, y: point.humid});
+      myChart.data.datasets[2].data.push({x: timestamp, y: point.soil});
+
+      if (myChart.data.datasets[0].data.length > 15) {
+        myChart.data.datasets.forEach(dataset => {
+          dataset.data.shift();
+        });
+      }
+    });
+    myChart.update();
+  };
+}
+</script>
+
+</body>
+</html>
