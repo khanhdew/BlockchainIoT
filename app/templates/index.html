@@ -8,10 +8,14 @@
             display: none;
             width: 100%;
             max-width: 600px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
         }
 
         #keyForm, #walletSteps {
-            margin-bottom: 20px;
+            margin: 0 auto;
         }
     </style>
 </head>
@@ -26,9 +30,8 @@
     <button onclick="selectWallet()">Select Wallet</button>
     <button onclick="signWallet()" disabled id="signButton">Sign Wallet</button>
 </div>
-<div>
-    <h2>Sensor Data Chart</h2>
-    <canvas id="myChart" height="200" width="1000"></canvas>
+<div style="width: 500px;height: 500px">
+    <canvas id="myChart" ></canvas>
 </div>
 
 <script type="module">
@@ -143,8 +146,16 @@
             },
             options: {
                 responsive: true,
+                maintainAspectRatio:false,
+                aspectRatio:2,
                 plugins: {
-                    legend: {display: true}
+                    legend: {display: true},
+                    title: {
+                        display: true,
+                        text: 'Sensor Data Chart',
+                        align: 'center',
+                        fullSize: true
+                    }
                 },
                 scales: {
                     y: {
