@@ -5,6 +5,10 @@ import random
 import json
 from Crypto.Util.Padding import pad, unpad  # Sử dụng padding PKCS7 từ thư viện Crypto
 
+from app.database.connector import Connector
+
+conn = Connector()
+
 # Danh sách các ký tự để tạo key ngẫu nhiên
 letters = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
            'w', 'x', 'y', 'z',
@@ -30,6 +34,9 @@ try:
             raise ValueError("File is empty")
 except (FileNotFoundError, ValueError):
     key = gen_key()
+    conn.execute(f"INSERT INTO \"hash_key\" (hash) VALUES ('{key}')")
+    conn.commit()
+    print("Saved to db")
     with open("key.key", "wb") as f:
         f.write(key.encode('utf-8'))
 
@@ -59,13 +66,15 @@ class EncryptModel:
         chunks = [encrypted_message[i:i + chunk_size] for i in range(0, len(encrypted_message), chunk_size)]
         return chunks
 
-    def decrypt(self, encrypted_chunks: list) -> str:
+    def decrypt(self, encrypted_chunks: list, key = None) -> str:
+        if key is None:
+            key = self.key
         """ Giải mã dữ liệu đã mã hóa, yêu cầu danh sách các chuỗi mã hóa đã chia nhỏ """
         # Ghép các chuỗi nhỏ lại thành một chuỗi mã hóa đầy đủ
         encrypted_message = ''.join(encrypted_chunks)
         encrypted_data = base64.b64decode(encrypted_message)  # Giải mã Base64
         iv = encrypted_data[:AES.block_size]  # Lấy IV từ đầu chuỗi đã mã hóa
-        cipher = AES.new(self.key.encode('utf-8'), AES.MODE_CBC, iv)  # Khởi tạo AES với IV
+        cipher = AES.new(key.encode('utf-8'), AES.MODE_CBC, iv)  # Khởi tạo AES với IV
         decrypted_data = unpad(cipher.decrypt(encrypted_data[AES.block_size:]),
                                AES.block_size)  # Giải mã và bỏ padding PKCS7
         return decrypted_data.decode('utf-8')

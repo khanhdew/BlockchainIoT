@@ -12,12 +12,15 @@ from fastapi import Request
 from app.blockfrost_api.get_trans import get_metadata_from_tx, get_latest_tx
 from app.mqtt import connect
 from app.hashing_service.encrypt import EncryptModel
+from app.database.connector import Connector
+
 
 app = FastAPI()
 templates = Jinja2Templates(directory="app/templates")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 content = ""
 ecrypt = EncryptModel()
+conn = Connector()
 
 with open("app/templates/index.html") as f:
     lines = f.readlines()
@@ -95,11 +98,18 @@ def create_app():
             role = manager.get_role(client_host)
 
             while True:
-                metadatas = await get_metadata_from_tx(await get_latest_tx())
+                tx_hash = await get_latest_tx()
+                metadatas = await get_metadata_from_tx(tx_hash)
 
                 # If the user is the master, decrypt data before sending
                 if role == "master":
-                    decrypted_data = ecrypt.decrypt(metadatas)
+                    cursor = conn.execute(f"SELECT \"hash_key\".hash FROM \"transaction\" inner join \"hash_key\" "
+                                            f"on \"transaction\".hash_key = \"hash_key\".id "
+                                            f"WHERE \"transaction\".hash = '{tx_hash}'")
+                    hash_key = None
+                    for row in cursor:
+                        hash_key = row[0]
+                    decrypted_data = ecrypt.decrypt(metadatas,key=hash_key)
                     metadatas = json.loads(decrypted_data)
 
                 # Send the first 15 metadata

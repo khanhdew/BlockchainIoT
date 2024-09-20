@@ -7,8 +7,9 @@ from paho.mqtt import client as mqtt_client
 
 from app.wallet_service.create_transaction import create_transaction
 from app.hashing_service.encrypt import EncryptModel
+from app.database.connector import Connector
 
-ecrypt = EncryptModel()
+
 broker = 'localhost'
 port = 1883
 topic = "v1/devices/me/telemetry"
@@ -16,7 +17,8 @@ topic = "v1/devices/me/telemetry"
 client_id = f'python-mqtt-{random.randint(0, 1000)}'
 last_time = time.time()
 datapoint = []
-
+ecrypt = EncryptModel()
+conn = Connector()
 def connect_mqtt() -> mqtt_client:
     def on_connect(client, userdata, flags, rc):
         if rc == 0:
@@ -54,7 +56,12 @@ def subscribe(client: mqtt_client):
                 last_time = time.time()
                 tx_log = create_transaction(sensor_data)
                 print(tx_log)
-                # print(sensor_data)
+                cursor = conn.execute(f"select id from \"hash_key\" where hash = '{ecrypt.key}'")
+                ecrypt_key_id = None
+                for row in cursor:
+                    ecrypt_key_id= row[0]
+                conn.execute(f"INSERT INTO \"transaction\" (hash, time, hash_key) VALUES ('{tx_log}', {time.time()}, {ecrypt_key_id})")
+                conn.commit()
                 datapoint.clear()
                 logging.info("Sent data to blockchain")
         except Exception as e:

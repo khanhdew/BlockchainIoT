@@ -1,7 +1,12 @@
 from blockfrost import BlockFrostApi, ApiError, ApiUrls
 import requests
 from from_root import from_root
+
 from app.wallet_service import config
+from app.database.connector import Connector
+
+conn = Connector()
+
 api = BlockFrostApi(
     project_id=f'{config.project_key}',  # or export environment variable BLOCKFROST_PROJECT_ID
     # optional: pass base_url or export BLOCKFROST_API_URL to use testnet, defaults to ApiUrls.mainnet.value
@@ -10,23 +15,13 @@ api = BlockFrostApi(
 wallet_address =""
 with open(from_root("app/wallet_service","base.addr")) as f:
     wallet_address = f.readline()
-    # print(wallet_address)
 async def get_latest_tx():
     try:
-        response = requests.get("https://cardano-preview.blockfrost.io/api/v0/addresses/" + wallet_address +"/transactions?count=1&order=desc",
-                                headers={"project_id": config.project_key})
-        # print(response.json()[0]['tx_hash'])
-        return response.json()[0]['tx_hash']
-    except ApiError as e:
-        print(f"API error: {e}")
-    except Exception as e:
-        print(f"Exception: {e}")
-
-async def get_two_latest_tx():
-    try:
-        response = requests.get("https://cardano-preview.blockfrost.io/api/v0/addresses/" + wallet_address +"/transactions?count=2&order=desc",
-                                headers={"project_id": config.project_key})
-        return [response.json()[0]['tx_hash'],response.json()[0]['tx_hash']]
+        cursor = conn.execute(f"select * from \"transaction\" order by id desc limit 1")
+        tx_hash = ""
+        for row in cursor:
+            tx_hash = row[1]
+        return tx_hash
     except ApiError as e:
         print(f"API error: {e}")
     except Exception as e:
