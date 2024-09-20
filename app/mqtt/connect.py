@@ -6,7 +6,9 @@ import time
 from paho.mqtt import client as mqtt_client
 
 from app.wallet_service.create_transaction import create_transaction
+from app.hashing_service.encrypt import EncryptModel
 
+ecrypt = EncryptModel()
 broker = 'localhost'
 port = 1883
 topic = "v1/devices/me/telemetry"
@@ -31,9 +33,10 @@ def connect_mqtt() -> mqtt_client:
 def subscribe(client: mqtt_client):
     def on_message(client, userdata, msg):
         global last_time
-        recv_message = msg.payload.decode()
-        print(recv_message)
+
         try:
+            recv_message = msg.payload.decode()
+            print(recv_message)
             temp = json.loads(recv_message)
             datapoint.append({
                 "temp": int(temp['device']['sensor']['dht']['temp']),
@@ -41,12 +44,13 @@ def subscribe(client: mqtt_client):
                 "soil": int(temp['device']['sensor']['soil']),
                 "timestamp": int(time.time())
             })
-            sensor_data = {
-                674: datapoint
-            }
-            print(time.time() - last_time)
+            print(ecrypt.encrypt(json.dumps(datapoint)))
+            print(ecrypt.decrypt(json.dumps(datapoint)))
             # each 5 minutes send data to blockchain
             if time.time() - last_time >= 300:
+                sensor_data = {
+                    674: ecrypt.encrypt(json.dumps(datapoint))
+                }
                 last_time = time.time()
                 tx_log = create_transaction(sensor_data)
                 print(tx_log)

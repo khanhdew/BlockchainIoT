@@ -22,9 +22,19 @@ def get_latest_tx():
     except Exception as e:
         print(f"Exception: {e}")
 
-def get_metadata_from_tx():
+def get_two_latest_tx():
     try:
-        response = requests.get("https://cardano-preview.blockfrost.io/api/v0/txs/" + get_latest_tx() +"/metadata",
+        response = requests.get("https://cardano-preview.blockfrost.io/api/v0/addresses/" + wallet_address +"/transactions?count=2&order=desc",
+                                headers={"project_id": config.project_key})
+        return [response.json()[0]['tx_hash'],response.json()[0]['tx_hash']]
+    except ApiError as e:
+        print(f"API error: {e}")
+    except Exception as e:
+        print(f"Exception: {e}")
+
+def get_metadata_from_tx(tx_hash):
+    try:
+        response = requests.get("https://cardano-preview.blockfrost.io/api/v0/txs/" + tx_hash +"/metadata",
                                 headers={"project_id": config.project_key})
         # print(response.json()[0]['json_metadata'])
         metadata = response.json()[0]['json_metadata']
@@ -34,4 +44,3 @@ def get_metadata_from_tx():
     except Exception as e:
         print(f"Exception: {e}")
     return None
-
