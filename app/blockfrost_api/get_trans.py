@@ -11,7 +11,7 @@ wallet_address =""
 with open(from_root("app/wallet_service","base.addr")) as f:
     wallet_address = f.readline()
     # print(wallet_address)
-def get_latest_tx():
+async def get_latest_tx():
     try:
         response = requests.get("https://cardano-preview.blockfrost.io/api/v0/addresses/" + wallet_address +"/transactions?count=1&order=desc",
                                 headers={"project_id": config.project_key})
@@ -22,7 +22,7 @@ def get_latest_tx():
     except Exception as e:
         print(f"Exception: {e}")
 
-def get_two_latest_tx():
+async def get_two_latest_tx():
     try:
         response = requests.get("https://cardano-preview.blockfrost.io/api/v0/addresses/" + wallet_address +"/transactions?count=2&order=desc",
                                 headers={"project_id": config.project_key})
@@ -32,7 +32,7 @@ def get_two_latest_tx():
     except Exception as e:
         print(f"Exception: {e}")
 
-def get_metadata_from_tx(tx_hash):
+async def get_metadata_from_tx(tx_hash):
     try:
         response = requests.get("https://cardano-preview.blockfrost.io/api/v0/txs/" + tx_hash +"/metadata",
                                 headers={"project_id": config.project_key})

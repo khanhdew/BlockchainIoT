@@ -47,7 +47,6 @@
 </script>
 
 <script>
-    const validKey = '123456';  // Replace with your valid key
     let myChart;
     let ws;
     let lucidInstance;
@@ -55,7 +54,17 @@
     async function checkKey() {
         const keyInput = document.getElementById('keyInput').value;
 
-        if (keyInput === validKey) {
+        // post request to /check_key to check if key is valid
+        // if key is valid, show wallet steps
+        response = await fetch('/check_key', {
+            method: 'POST',
+            body: JSON.stringify({key: keyInput}),
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.status === 200) {
             showChart();
         } else {
             // Show wallet steps
@@ -166,10 +175,11 @@
         if (ws) {
             ws.close();
         }
-        ws = new WebSocket(`ws://localhost:8000/ws?token=${key}`);
+        ws = new WebSocket(`ws://localhost:8000/ws`);
         ws.onmessage = function (event) {
             const sensorData = JSON.parse(event.data);
-            sensorData.forEach(data => {
+
+            sensorData["metadata"].forEach(data => {
                 const timestamp = new Date(data.timestamp * 1000);
                 myChart.data.datasets[0].data.push({x: timestamp, y: data.temp});
                 myChart.data.datasets[1].data.push({x: timestamp, y: data.humid});

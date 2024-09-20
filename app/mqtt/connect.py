@@ -44,12 +44,12 @@ def subscribe(client: mqtt_client):
                 "soil": int(temp['device']['sensor']['soil']),
                 "timestamp": int(time.time())
             })
-            print(ecrypt.encrypt(json.dumps(datapoint)))
-            print(ecrypt.decrypt(json.dumps(datapoint)))
+
             # each 5 minutes send data to blockchain
             if time.time() - last_time >= 300:
+                data_to_encrypt = json.dumps(datapoint)
                 sensor_data = {
-                    674: ecrypt.encrypt(json.dumps(datapoint))
+                    674: ecrypt.encrypt(data_to_encrypt)
                 }
                 last_time = time.time()
                 tx_log = create_transaction(sensor_data)
