@@ -43,6 +43,7 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
         self.connection_roles: Dict[str, str] = {}  # Map session IDs to roles (master or user)
+        self.permission_requests: Dict[str, bool] = {}  # Map session IDs to permission status
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
@@ -52,6 +53,8 @@ class ConnectionManager:
         self.active_connections.remove(websocket)
         if websocket.client.host in self.connection_roles:
             del self.connection_roles[websocket.client.host]
+        if websocket.client.host in self.permission_requests:
+            del self.permission_requests[websocket.client.host]
 
     async def send_personal_message(self, message, websocket: WebSocket):
         await websocket.send_json(message)
@@ -61,6 +64,21 @@ class ConnectionManager:
 
     def get_role(self, client_host: str):
         return self.connection_roles.get(client_host, "user")
+
+    def request_permission(self, client_host: str):
+        self.permission_requests[client_host] = False
+
+    def grant_permission(self, client_host: str):
+        self.permission_requests[client_host] = True
+
+    def has_permission(self, client_host: str):
+        return self.permission_requests.get(client_host, False)
+
+    def get_owner(self) -> str:
+        for host, role in self.connection_roles.items():
+            if role == "master":
+                return host
+        return ""
 
 
 manager = ConnectionManager()
@@ -97,26 +115,31 @@ def create_app():
             # Check the role based on the HTTP POST verification
             role = manager.get_role(client_host)
 
+            if role != "master":
+                # Request permission for non-master users
+                manager.request_permission(manager.get_owner())
+                await manager.send_personal_message({"request": "permission"}, websocket)
+
             while True:
                 tx_hash = await get_latest_tx()
                 metadatas = await get_metadata_from_tx(tx_hash)
 
-                # If the user is the master, decrypt data before sending
-                if role == "master":
+                # Only send decrypted data if the user is the master
+                if role == "master" or manager.has_permission(client_host):
                     cursor = conn.execute(f"SELECT \"hash_key\".hash FROM \"transaction\" inner join \"hash_key\" "
-                                            f"on \"transaction\".hash_key = \"hash_key\".id "
-                                            f"WHERE \"transaction\".hash = '{tx_hash}'")
+                                          f"on \"transaction\".hash_key = \"hash_key\".id "
+                                          f"WHERE \"transaction\".hash = '{tx_hash}'")
                     hash_key = None
                     for row in cursor:
                         hash_key = row[0]
-                    decrypted_data = ecrypt.decrypt(metadatas,key=hash_key)
+                    decrypted_data = ecrypt.decrypt(metadatas, key=hash_key)
                     metadatas = json.loads(decrypted_data)
 
                 # Send the first 15 metadata
-                await manager.send_personal_message({"metadata": metadatas[:15]}, websocket)
+                await manager.send_personal_message({"metadata": metadatas[:int(len(metadatas)/2)]}, websocket)
 
                 # Send the remaining metadata one by one
-                for metadata in metadatas[15:]:
+                for metadata in metadatas[int(len(metadatas)/2):]:
                     await manager.send_personal_message({"metadata": [metadata]}, websocket)
                     await asyncio.sleep(5)
 

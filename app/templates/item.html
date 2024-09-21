@@ -1,9 +1,205 @@
+<!DOCTYPE html>
 <html>
 <head>
-    <title>Item Details</title>
-    <link href="{{ url_for('static', path='/css/style.css') }}" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0"></script>
+    <style>
+        #myChart {
+            display: none;
+            width: 100%;
+            max-width: 600px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        #keyForm, #walletSteps {
+            margin: 0 auto;
+        }
+    </style>
 </head>
 <body>
-    <h1><a href="{{ url_for('read_item', id=id) }}">Item ID: {{ id }}</a></h1>
+<div id="keyForm">
+    <label for="keyInput">Enter Key:</label>
+    <input type="text" id="keyInput">
+    <button onclick="checkKey()">Submit</button>
+</div>
+
+<div id="walletSteps" style="display: none;">
+    <button onclick="selectWallet()">Select Wallet</button>
+    <button onclick="signWallet()" disabled id="signButton">Sign Wallet</button>
+</div>
+<div style="width: 500px;height: 500px">
+    <canvas id="myChart" ></canvas>
+</div>
+
+<script type="module">
+    import {Lucid, Blockfrost} from "https://unpkg.com/lucid-cardano/web/mod.js"
+
+    window.initializeLucid = async function () {
+        const lucid = await Lucid.new(
+            new Blockfrost("https://cardano-preview.blockfrost.io/api/v0", "previewZjUdBlro0hnCrCRKdOaVpJqUUkRstQOp"),
+            "Preview",
+        );
+        const api = await window.cardano.eternl.enable();
+        lucid.selectWallet(api);
+        console.log("Lucid initialized");
+        return lucid;
+    }
+</script>
+
+<script>
+    let myChart;
+    let ws;
+    let lucidInstance;
+
+    async function checkKey() {
+        const keyInput = document.getElementById('keyInput').value;
+
+        // post request to /check_key to check if key is valid
+        // if key is valid, show wallet steps
+        response = await fetch('/check_key', {
+            method: 'POST',
+            body: JSON.stringify({key: keyInput}),
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+
+
+
+    }
+
+showChart();
+    async function selectWallet() {
+        try {
+            lucidInstance = await window.initializeLucid();
+            alert('Wallet selected successfully');
+            document.getElementById('signButton').disabled = false;
+        } catch (error) {
+            console.error('Error selecting wallet:', error);
+            alert('Error selecting wallet');
+        }
+    }
+
+    async function signWallet() {
+        if (!lucidInstance) {
+            alert('Please select a wallet first');
+            return;
+        }
+        try {
+            await new Promise(resolve => setTimeout(resolve, 1000));  // Simulate signing
+            alert('Wallet signed successfully');
+            showChart();
+        } catch (error) {
+            console.error('Error signing wallet:', error);
+            alert('Error signing wallet');
+        }
+    }
+
+    function showChart() {
+        document.getElementById('keyForm').style.display = 'none';
+        document.getElementById('walletSteps').style.display = 'none';
+        document.getElementById('myChart').style.display = 'block';
+        initializeChart();
+        startWebSocket();
+    }
+
+    function initializeChart() {
+        const ctx = document.getElementById('myChart').getContext('2d');
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: [
+                    {
+                        label: 'Temperature',
+                        fill: false,
+                        tension: 0.1,
+                        backgroundColor: "rgba(255,0,0,1.0)",
+                        borderColor: "rgba(255,0,0,0.5)",
+                        data: []
+                    },
+                    {
+                        label: 'Humidity',
+                        fill: false,
+                        tension: 0.1,
+                        backgroundColor: "rgba(0,255,0,1.0)",
+                        borderColor: "rgba(0,255,0,0.5)",
+                        data: []
+                    },
+                    {
+                        label: 'Soil Moisture',
+                        fill: false,
+                        tension: 0.1,
+                        backgroundColor: "rgba(0,0,255,1.0)",
+                        borderColor: "rgba(0,0,255,0.5)",
+                        data: []
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio:false,
+                aspectRatio:2,
+                plugins: {
+                    legend: {display: true},
+                    title: {
+                        display: true,
+                        text: 'Sensor Data Chart',
+                        align: 'center',
+                        fullSize: true
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        suggestedMax: 100
+                    },
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'second',
+                            displayFormats: {
+                                second: 'HH:mm:ss'
+                            }
+                        },
+                        ticks: {
+                            source: 'auto',
+                            autoSkip: true,
+                            maxTicksLimit: 15
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function startWebSocket() {
+        const key = document.getElementById('keyInput').value;
+        if (ws) {
+            ws.close();
+        }
+        ws = new WebSocket(`ws://localhost:8000/ws`);
+        ws.onmessage = function (event) {
+            const sensorData = JSON.parse(event.data);
+
+            sensorData["metadata"].forEach(data => {
+                const timestamp = new Date(data.timestamp * 1000);
+                myChart.data.datasets[0].data.push({x: timestamp, y: data.temp});
+                myChart.data.datasets[1].data.push({x: timestamp, y: data.humid});
+                myChart.data.datasets[2].data.push({x: timestamp, y: data.soil});
+                if (myChart.data.datasets[0].data.length > 15) {
+                    myChart.data.datasets.forEach(dataset => {
+                        dataset.data.shift();
+                    });
+                }
+                myChart.update();
+            });
+        };
+    }
+</script>
+
 </body>
 </html>
