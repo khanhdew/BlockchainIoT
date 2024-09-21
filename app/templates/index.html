@@ -7,7 +7,6 @@
         #myChart {
             display: none;
             width: 100%;
-            max-width: 600px;
             position: absolute;
             top: 50%;
             left: 50%;
@@ -16,6 +15,70 @@
 
         #keyForm, #walletSteps {
             margin: 0 auto;
+        }
+
+        #notAuthorized {
+            display: none;
+            text-align: center;
+            margin-top: -150px;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        #keyForm, #walletSteps, #myChart {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        input[type="text"] {
+            padding: 10px;
+            width: 200px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+        }
+
+        button:hover:not(:disabled) {
+            background-color: #0056b3;
+        }
+
+        /*add request panel to the right conner of screen*/
+        #requestsPanel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 300px;
+            height: 100%;
+            background-color: #fff;
+            box-shadow: -5px 0 5px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            display: none;
         }
     </style>
 </head>
@@ -30,8 +93,16 @@
     <button onclick="selectWallet()">Select Wallet</button>
     <button onclick="signWallet()" disabled id="signButton">Sign Wallet</button>
 </div>
-<div style="width: 500px;height: 500px">
-    <canvas id="myChart" ></canvas>
+<div id="notAuthorized">
+    <p>You are not authorized</p>
+    <button onclick="request_permission()">Request Permission</button>
+</div>
+<div id="requestsPanel">
+    <h2>Requests</h2>
+    <ul id="requestsList"></ul>
+</div>
+<div style="width: 1000px;height: 500px">
+    <canvas id="myChart"></canvas>
 </div>
 
 <script type="module">
@@ -55,26 +126,31 @@
     let lucidInstance;
 
     async function checkKey() {
-        const keyInput = document.getElementById('keyInput').value;
-
-        // post request to /check_key to check if key is valid
-        // if key is valid, show wallet steps
-        response = await fetch('/check_key', {
+        const key = document.getElementById('keyInput').value;
+        const response = await fetch('/check_key', {
             method: 'POST',
-            body: JSON.stringify({key: keyInput}),
             headers: {
-                'Content-Type': 'application/json'
-            }
+                'Content-Type': 'application/json',
+                'client_id': client_id
+            },
+            body: JSON.stringify({key: key})
         });
 
-        if (response.status === 200) {
-            showChart();
+        if (response.ok) {
+            const data = await response.json();
+            console.log(data.status);
         } else {
-            // Show wallet steps
-            document.getElementById('keyForm').style.display = 'none';
-            document.getElementById('walletSteps').style.display = 'block';
-
+            console.error('Invalid key');
         }
+        showChart()
+        // if (response.status === 200) {
+        //     showChart();
+        // } else {
+        //     // Show wallet steps
+        //     document.getElementById('keyForm').style.display = 'none';
+        //     document.getElementById('walletSteps').style.display = 'block';
+        //
+        // }
     }
 
 
@@ -146,8 +222,8 @@
             },
             options: {
                 responsive: true,
-                maintainAspectRatio:false,
-                aspectRatio:2,
+                maintainAspectRatio: false,
+                aspectRatio: 2,
                 plugins: {
                     legend: {display: true},
                     title: {
@@ -181,27 +257,91 @@
         });
     }
 
+    // Request permission to view sensor data post
+    function request_permission() {
+        fetch('/request_permission', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'client_id': client_id
+            }
+        });
+    }
+
+    function handleRequestResponse(client_id, action) {
+        fetch('/handle_request_response', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'client_id': client_id
+            },
+            body: JSON.stringify({ action: action, client_id: client_id })
+        });
+    }
+
+
+    let client_id = generateClientId(); // Implement this function to generate a unique client ID
+
+    function generateClientId() {
+        const timestamp = Date.now().toString(36); // Convert current timestamp to base-36 string
+        const randomNum = Math.random().toString(36).substring(2, 15); // Generate a random base-36 string
+        return `${timestamp}-${randomNum}`;
+    }
+
     function startWebSocket() {
-        const key = document.getElementById('keyInput').value;
         if (ws) {
             ws.close();
         }
-        ws = new WebSocket(`ws://localhost:8000/ws`);
-        ws.onmessage = function (event) {
-            const sensorData = JSON.parse(event.data);
 
-            sensorData["metadata"].forEach(data => {
-                const timestamp = new Date(data.timestamp * 1000);
-                myChart.data.datasets[0].data.push({x: timestamp, y: data.temp});
-                myChart.data.datasets[1].data.push({x: timestamp, y: data.humid});
-                myChart.data.datasets[2].data.push({x: timestamp, y: data.soil});
-                if (myChart.data.datasets[0].data.length > 15) {
-                    myChart.data.datasets.forEach(dataset => {
-                        dataset.data.shift();
+        ws = new WebSocket(`ws://localhost:8000/ws`);
+        ws.onopen = function () {
+            ws.send(JSON.stringify({client_id: client_id}));
+        };
+        ws.onmessage = function (event) {
+            const data_recv = JSON.parse(event.data);
+
+            try {
+                if (data_recv["metadata"]) {
+                    data_recv["metadata"].forEach(data => {
+                        const timestamp = new Date(data.timestamp * 1000);
+                        myChart.data.datasets[0].data.push({x: timestamp, y: data.temp});
+                        myChart.data.datasets[1].data.push({x: timestamp, y: data.humid});
+                        myChart.data.datasets[2].data.push({x: timestamp, y: data.soil});
+                        if (myChart.data.datasets[0].data.length > 15) {
+                            myChart.data.datasets.forEach(dataset => {
+                                dataset.data.shift();
+                            });
+                        }
+                        myChart.update();
                     });
+                } else if (data_recv["permission"] === "not authorized") {
+                    document.getElementById('notAuthorized').style.display = 'block';
+                } else if (data_recv["request"]) {
+                    document.getElementById('requestsPanel').style.display = 'block';
+                    const request = data_recv["request"];
+                    const li = document.createElement('li');
+                    li.textContent = `Request from ${request}`;
+                    document.getElementById('requestsList').appendChild(li);
+                    const approveButton = document.createElement('button');
+                    approveButton.textContent = 'Approve';
+                    approveButton.onclick = function () {
+                        li.remove();
+                        handleRequestResponse(request, 'approve');
+                    };
+                    li.appendChild(approveButton);
+                    const denyButton = document.createElement('button');
+                    denyButton.textContent = 'Deny';
+                    denyButton.onclick = function () {
+                        li.remove();
+                        handleRequestResponse(request, 'deny');
+                    };
+                    li.appendChild(denyButton);
+                } else if (data_recv["approved"]) {
+                    document.getElementById('notAuthorized').style.display = 'none';
                 }
-                myChart.update();
-            });
+            } catch (e) {
+                console.error(e);
+            }
         };
     }
 </script>
